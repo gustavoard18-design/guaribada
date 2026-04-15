@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 const AppContext = createContext();
 
-const API = axios.create({ baseURL: '/api' });
+const API = axios.create({ baseURL: 'https://guaribada-production.up.railway.app/api' });
 
 API.interceptors.request.use(cfg => {
   const token = localStorage.getItem('token');
