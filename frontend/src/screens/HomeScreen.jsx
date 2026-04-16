@@ -98,7 +98,7 @@ export default function HomeScreen() {
         <span className="text-2xl">📍</span>
         <div>
           <p className="text-white font-medium text-sm">Guaribada Lava-Jato</p>
-          <p className="text-white/50 text-xs">Carmo, RJ · Seg–Sáb 8h–18h</p>
+          <p className="text-white/50 text-xs">Av. José Ribeiro de Moura, 700 - Centro, Carmo - RJ · Ao lado do Posto Ribeiro · Seg–Sáb 8h–18h</p>
         </div>
       </div>
     </div>
