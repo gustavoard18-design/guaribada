@@ -2,21 +2,31 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 
-const Field = ({ label, type = 'text', value, onChange, placeholder }) => (
+const Field = ({ label, type = 'text', value, onChange, placeholder, maxLength }) => (
   <div>
     <label className="block text-white/70 text-sm mb-1.5 font-medium">{label}</label>
     <input
-      type={type} value={value} onChange={onChange} placeholder={placeholder}
+      type={type} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength}
       className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] transition-colors"
     />
   </div>
 );
 
+function maskPhone(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 7) return `(${digits.slice(0,2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+}
+
 export default function RegisterScreen() {
   const { register, setScreen } = useApp();
   const [form, setForm]       = useState({ name: '', email: '', phone: '', password: '' });
   const [loading, setLoading] = useState(false);
+
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const setPhone = (e) => setForm(f => ({ ...f, phone: maskPhone(e.target.value) }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (form.password.length < 6) return toast.error('Senha deve ter no mínimo 6 caracteres');
@@ -30,6 +40,7 @@ export default function RegisterScreen() {
       setLoading(false);
     }
   };
+
   return (
     <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center p-6">
       <div className="text-center mb-8">
@@ -40,7 +51,7 @@ export default function RegisterScreen() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
         <Field label="Nome completo" value={form.name} onChange={set('name')} placeholder="João Silva" />
         <Field label="E-mail" type="email" value={form.email} onChange={set('email')} placeholder="seu@email.com" />
-        <Field label="WhatsApp" type="tel" value={form.phone} onChange={set('phone')} placeholder="(24) 99999-9999" />
+        <Field label="WhatsApp" type="tel" value={form.phone} onChange={setPhone} placeholder="(24) 99999-9999" maxLength={15} />
         <Field label="Senha" type="password" value={form.password} onChange={set('password')} placeholder="••••••••" />
         <button
           type="submit" disabled={loading}
