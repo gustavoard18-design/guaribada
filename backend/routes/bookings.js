@@ -19,18 +19,20 @@ router.get('/available-slots', authenticate, async (req, res) => {
     status: { $nin: ['cancelled'] },
   }).populate('service');
 
-  // Build occupied minutes
-  const occupied = new Set();
+ // Build occupied minutes (count per interval)
+  const occupied = {};
   booked.forEach(b => {
     const slotStart = b.date.getHours() * 60 + b.date.getMinutes();
-    for (let m = slotStart; m < slotStart + b.service.duration; m += 30) occupied.add(m);
+    for (let m = slotStart; m < slotStart + b.service.duration; m += 30) {
+      occupied[m] = (occupied[m] || 0) + 1;
+    }
   });
 
-  // Generate 30-min slots from 08:00 to 17:30
+  // Generate 30-min slots from 08:00 to 17:30 (max 2 per slot)
   const slots = [];
   for (let m = 8 * 60; m <= 17 * 60 + 30; m += 30) {
     const slotEnd = m + service.duration;
-    const available = ![...Array(Math.ceil(service.duration / 30))].some((_, i) => occupied.has(m + i * 30))
+    const available = ![...Array(Math.ceil(service.duration / 30))].some((_, i) => (occupied[m + i * 30] || 0) >= 2)
                    && slotEnd <= 18 * 60;
     const hh = String(Math.floor(m / 60)).padStart(2, '0');
     const mm = String(m % 60).padStart(2, '0');
