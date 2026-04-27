@@ -22,12 +22,13 @@ function Router() {
   );
 
   const screens = {
-    login:      <LoginScreen />,
-    register:   <RegisterScreen />,
-    home:       <HomeScreen />,
-    booking:    <BookingScreen />,
-    mybookings: <MyBookingsScreen />,
-    admin:      <AdminDashboard />,
+    login:        <LoginScreen />,
+    register:     <RegisterScreen />,
+    home:         <HomeScreen />,
+    booking:      <BookingScreen />,
+    guestbooking: <BookingScreen guestMode />,
+    mybookings:   <MyBookingsScreen />,
+    admin:        <AdminDashboard />,
     adminservices: <AdminServices />,
   };
 

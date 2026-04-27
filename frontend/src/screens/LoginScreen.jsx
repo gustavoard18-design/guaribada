@@ -64,6 +64,20 @@ export default function LoginScreen() {
           Cadastre-se
         </button>
       </p>
+
+      <div className="mt-4 w-full max-w-sm">
+        <div className="flex items-center gap-3 my-2">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-white/30 text-xs">ou</span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+        <button
+          onClick={() => setScreen('guestbooking')}
+          className="w-full border border-white/10 hover:border-white/20 text-white/70 font-semibold py-4 rounded-2xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+        >
+          📅 Agendar sem cadastro
+        </button>
+      </div>
     </div>
   );
 }

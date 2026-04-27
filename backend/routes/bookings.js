@@ -1,10 +1,35 @@
 const router = require('express').Router();
 const Booking = require('../models/Booking');
 const Service = require('../models/Service');
-const { authenticate, adminOnly } = require('../middleware/auth');
+const { authenticate, adminOnly, optionalAuthenticate } = require('../middleware/auth');
 
-// GET /api/bookings/available-slots?date=YYYY-MM-DD&serviceId=xxx
-router.get('/available-slots', authenticate, async (req, res) => {
+// Helper: build occupied minutes set for a given day
+async function getOccupiedMinutes(dayStart, dayEnd, excludeId = null) {
+  const query = {
+    date: { $gte: dayStart, $lt: dayEnd },
+    status: { $nin: ['cancelled'] },
+  };
+  if (excludeId) query._id = { $ne: excludeId };
+
+  const booked = await Booking.find(query).populate('service');
+  const occupied = new Set();
+  booked.forEach(b => {
+    const slotStart = b.date.getHours() * 60 + b.date.getMinutes();
+    for (let m = slotStart; m < slotStart + b.service.duration; m += 30) occupied.add(m);
+  });
+  return occupied;
+}
+
+// Helper: check if a given date/duration has a conflict
+function hasTimeConflict(occupied, bookingDate, duration) {
+  const requestedMinute = bookingDate.getHours() * 60 + bookingDate.getMinutes();
+  const slotsNeeded = Math.ceil(duration / 30);
+  return Array.from({ length: slotsNeeded }, (_, i) => requestedMinute + i * 30)
+              .some(m => occupied.has(m));
+}
+
+// GET /api/bookings/available-slots?date=YYYY-MM-DD&serviceId=xxx  (public)
+router.get('/available-slots', async (req, res) => {
   const { date, serviceId } = req.query;
   if (!date || !serviceId) return res.status(400).json({ error: 'Parâmetros ausentes' });
 
@@ -14,17 +39,7 @@ router.get('/available-slots', authenticate, async (req, res) => {
   const start = new Date(date); start.setHours(8, 0, 0, 0);
   const end   = new Date(date); end.setHours(18, 0, 0, 0);
 
-  const booked = await Booking.find({
-    date: { $gte: start, $lt: end },
-    status: { $nin: ['cancelled'] },
-  }).populate('service');
-
-  // Build occupied minutes
-  const occupied = new Set();
-  booked.forEach(b => {
-    const slotStart = b.date.getHours() * 60 + b.date.getMinutes();
-    for (let m = slotStart; m < slotStart + b.service.duration; m += 30) occupied.add(m);
-  });
+  const occupied = await getOccupiedMinutes(start, end);
 
   // Generate 30-min slots from 08:00 to 17:30
   const slots = [];
@@ -39,21 +54,46 @@ router.get('/available-slots', authenticate, async (req, res) => {
   res.json(slots);
 });
 
-// POST /api/bookings
-router.post('/', authenticate, async (req, res) => {
+// POST /api/bookings  (autenticado ou convidado)
+router.post('/', optionalAuthenticate, async (req, res) => {
   try {
-    const { serviceId, date, vehicle, notes } = req.body;
+    const { serviceId, date, vehicle, notes, guest } = req.body;
+
+    if (!serviceId || !date) return res.status(400).json({ error: 'Serviço e data são obrigatórios' });
+
+    // Precisa de usuário logado OU dados do convidado
+    if (!req.user && !guest?.name?.trim()) {
+      return res.status(400).json({ error: 'Nome é obrigatório para agendamento sem cadastro' });
+    }
+    if (!req.user && !guest?.phone?.trim()) {
+      return res.status(400).json({ error: 'Telefone é obrigatório para agendamento sem cadastro' });
+    }
+
     const service = await Service.findById(serviceId);
     if (!service) return res.status(404).json({ error: 'Serviço não encontrado' });
 
-    const booking = await Booking.create({
-      client: req.user._id,
+    const bookingDate = new Date(date);
+    if (isNaN(bookingDate.getTime())) return res.status(400).json({ error: 'Data inválida' });
+
+    const dayStart = new Date(bookingDate); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(bookingDate); dayEnd.setHours(23, 59, 59, 999);
+
+    const occupied = await getOccupiedMinutes(dayStart, dayEnd);
+    if (hasTimeConflict(occupied, bookingDate, service.duration)) {
+      return res.status(409).json({ error: 'Horário não disponível. Escolha outro horário.' });
+    }
+
+    const bookingData = {
       service: serviceId,
-      date: new Date(date),
+      date: bookingDate,
       vehicle,
       notes,
       totalPrice: service.price,
-    });
+    };
+    if (req.user) bookingData.client = req.user._id;
+    if (guest?.name) bookingData.guest = guest;
+
+    const booking = await Booking.create(bookingData);
     await booking.populate(['client', 'service']);
     res.status(201).json(booking);
   } catch (err) {
@@ -61,21 +101,22 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/bookings/my — client's own bookings
+// GET /api/bookings/my — agendamentos do cliente logado
 router.get('/my', authenticate, async (req, res) => {
   const bookings = await Booking.find({ client: req.user._id })
     .populate('service').sort({ date: -1 });
   res.json(bookings);
 });
 
-// GET /api/bookings — admin: all bookings
+// GET /api/bookings — admin: todos os agendamentos
 router.get('/', authenticate, adminOnly, async (req, res) => {
   const { date, status } = req.query;
   const filter = {};
   if (status) filter.status = status;
   if (date) {
-    const d = new Date(date);
-    filter.date = { $gte: new Date(d.setHours(0,0,0,0)), $lt: new Date(d.setHours(23,59,59,999)) };
+    const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+    filter.date = { $gte: dayStart, $lt: dayEnd };
   }
   const bookings = await Booking.find(filter)
     .populate('client', 'name email phone')
@@ -100,6 +141,45 @@ router.get('/dashboard', authenticate, adminOnly, async (req, res) => {
   res.json({ total, todayCount, pending, completed, revenue: revenue[0]?.total || 0 });
 });
 
+// PATCH /api/bookings/:id/reschedule — remarcar agendamento
+router.patch('/:id/reschedule', authenticate, async (req, res) => {
+  try {
+    const { date } = req.body;
+    if (!date) return res.status(400).json({ error: 'Nova data é obrigatória' });
+
+    const booking = await Booking.findById(req.params.id).populate('service');
+    if (!booking) return res.status(404).json({ error: 'Agendamento não encontrado' });
+
+    const isOwner = booking.client?.toString() === req.user._id.toString();
+    if (!isOwner && req.user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' });
+
+    if (['cancelled', 'completed'].includes(booking.status)) {
+      return res.status(400).json({ error: 'Este agendamento não pode ser remarcado' });
+    }
+
+    const newDate = new Date(date);
+    if (isNaN(newDate.getTime())) return res.status(400).json({ error: 'Data inválida' });
+
+    const dayStart = new Date(newDate); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(newDate); dayEnd.setHours(23, 59, 59, 999);
+
+    const occupied = await getOccupiedMinutes(dayStart, dayEnd, req.params.id);
+    if (hasTimeConflict(occupied, newDate, booking.service.duration)) {
+      return res.status(409).json({ error: 'Horário não disponível. Escolha outro horário.' });
+    }
+
+    const updated = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { date: newDate, status: 'pending' },
+      { new: true }
+    ).populate(['client', 'service']);
+
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // PATCH /api/bookings/:id/status — admin
 router.patch('/:id/status', authenticate, adminOnly, async (req, res) => {
   const { status } = req.body;
@@ -109,11 +189,11 @@ router.patch('/:id/status', authenticate, adminOnly, async (req, res) => {
   res.json(booking);
 });
 
-// DELETE /api/bookings/:id — cancel
+// DELETE /api/bookings/:id — cancelar
 router.delete('/:id', authenticate, async (req, res) => {
   const booking = await Booking.findById(req.params.id);
   if (!booking) return res.status(404).json({ error: 'Agendamento não encontrado' });
-  const isOwner = booking.client.toString() === req.user._id.toString();
+  const isOwner = booking.client?.toString() === req.user._id.toString();
   if (!isOwner && req.user.role !== 'admin') return res.status(403).json({ error: 'Sem permissão' });
   await Booking.findByIdAndUpdate(req.params.id, { status: 'cancelled' });
   res.json({ message: 'Agendamento cancelado' });

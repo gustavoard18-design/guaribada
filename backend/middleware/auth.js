@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  JWT_SECRET não definido! Configure a variável de ambiente antes de ir para produção.');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'guaribada_secret_2024';
 
 exports.authenticate = async (req, res, next) => {
@@ -19,6 +22,18 @@ exports.authenticate = async (req, res, next) => {
 exports.adminOnly = (req, res, next) => {
   if (req.user?.role !== 'admin')
     return res.status(403).json({ error: 'Acesso restrito ao administrador' });
+  next();
+};
+
+exports.optionalAuthenticate = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return next();
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = await User.findById(decoded.id).select('-password');
+  } catch {
+    // token inválido — segue como convidado
+  }
   next();
 };
 

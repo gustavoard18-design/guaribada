@@ -12,7 +12,7 @@ const STATUS = {
 };
 
 export default function MyBookingsScreen() {
-  const { user, API, setScreen } = useApp();
+  const { user, API, setScreen, setRescheduleBooking } = useApp();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading]   = useState(true);
 
@@ -102,12 +102,20 @@ export default function MyBookingsScreen() {
                       </button>
                     )}
                     {!isPast && !['cancelled','completed'].includes(b.status) && (
-                      <button
-                        onClick={() => cancel(b._id)}
-                        className="text-red-400/70 text-xs font-semibold px-3 py-1.5 rounded-xl bg-red-400/10"
-                      >
-                        Cancelar
-                      </button>
+                      <>
+                        <button
+                          onClick={() => { setRescheduleBooking(b); setScreen('booking'); }}
+                          className="text-blue-400/80 text-xs font-semibold px-3 py-1.5 rounded-xl bg-blue-400/10"
+                        >
+                          📅 Remarcar
+                        </button>
+                        <button
+                          onClick={() => cancel(b._id)}
+                          className="text-red-400/70 text-xs font-semibold px-3 py-1.5 rounded-xl bg-red-400/10"
+                        >
+                          Cancelar
+                        </button>
+                      </>
                     )}
                     {b.status === 'completed' && (
                       <button

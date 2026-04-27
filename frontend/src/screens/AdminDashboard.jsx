@@ -101,9 +101,14 @@ export default function AdminDashboard() {
               <div key={b._id} className="bg-white/5 border border-white/10 rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
-                    <p className="text-white font-semibold">{b.client?.name}</p>
-                    <p className="text-white/50 text-xs truncate">{b.client?.email}</p>
-                    {b.client?.phone && <p className="text-white/40 text-xs">{b.client.phone}</p>}
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-white font-semibold">{b.client?.name || b.guest?.name}</p>
+                      {!b.client && <span className="text-white/30 text-xs border border-white/20 px-1.5 py-0.5 rounded-full">convidado</span>}
+                    </div>
+                    <p className="text-white/50 text-xs truncate">{b.client?.email || b.guest?.email || ''}</p>
+                    {(b.client?.phone || b.guest?.phone) && (
+                      <p className="text-white/40 text-xs">{b.client?.phone || b.guest?.phone}</p>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-white font-medium text-sm">{b.service?.name}</p>

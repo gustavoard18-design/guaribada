@@ -15,20 +15,28 @@ function formatDate(d) {
   return d.toISOString().split('T')[0];
 }
 
-export default function BookingScreen() {
-  const { user, API, setScreen } = useApp();
-  const [step, setStep]         = useState(1);
-  const [services, setServices] = useState([]);
-  const [selected, setSelected] = useState(null);
+export default function BookingScreen({ guestMode = false }) {
+  const { user, API, setScreen, rescheduleBooking, setRescheduleBooking } = useApp();
+  const isReschedule = !!rescheduleBooking;
+
+  const [step, setStep]               = useState(isReschedule ? 2 : 1);
+  const [services, setServices]       = useState([]);
+  const [selected, setSelected]       = useState(isReschedule ? rescheduleBooking.service : null);
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
-  const [slots, setSlots]       = useState([]);
+  const [slots, setSlots]             = useState([]);
   const [selectedSlot, setSelectedSlot] = useState('');
-  const [vehicle, setVehicle]   = useState({ plate: '', model: '', color: '' });
-  const [loading, setLoading]   = useState(false);
-  const [booking, setBooking]   = useState(null);
+  const [vehicle, setVehicle]         = useState({ plate: '', model: '', color: '' });
+  const [guest, setGuest]             = useState({ name: '', phone: '' });
+  const [loading, setLoading]         = useState(false);
+  const [booking, setBooking]         = useState(null);
+
+  const dates    = Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(new Date(), i + 1));
+  const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
   useEffect(() => {
     API.get('/services').then(r => setServices(r.data)).catch(() => {});
+    return () => { if (isReschedule) setRescheduleBooking(null); };
   }, []);
 
   useEffect(() => {
@@ -41,24 +49,30 @@ export default function BookingScreen() {
     }
   }, [selected, selectedDate]);
 
-  const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(new Date(), i + 1));
-  const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-  const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
   const handleBook = async () => {
-    if (!selected || !selectedSlot) return;
+    if (guestMode) {
+      if (!guest.name.trim()) return toast.error('Nome é obrigatório');
+      if (!guest.phone.trim()) return toast.error('Telefone é obrigatório');
+    }
     setLoading(true);
     try {
       const dateTime = new Date(`${selectedDate}T${selectedSlot}:00`);
-      const res = await API.post('/bookings', {
-        serviceId: selected._id,
-        date: dateTime.toISOString(),
-        vehicle,
-      });
-      await res;
-      setBooking({ ...res.data, clientName: user.name, serviceName: selected.name });
+
+      if (isReschedule) {
+        const res = await API.patch(`/bookings/${rescheduleBooking._id}/reschedule`, {
+          date: dateTime.toISOString(),
+        });
+        setBooking(res.data);
+        setRescheduleBooking(null);
+        toast.success('Agendamento remarcado!');
+      } else {
+        const payload = { serviceId: selected._id, date: dateTime.toISOString(), vehicle };
+        if (guestMode) payload.guest = guest;
+        const res = await API.post('/bookings', payload);
+        setBooking(res.data);
+        toast.success('Agendamento criado!');
+      }
       setStep(4);
-      toast.success('Agendamento criado!');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Erro ao agendar');
     } finally {
@@ -66,25 +80,65 @@ export default function BookingScreen() {
     }
   };
 
+  const clientName = guestMode ? guest.name : (user?.name || '');
+  const successBooking = booking
+    ? { clientName, serviceName: selected?.name, date: booking.date }
+    : null;
+
   return (
     <div className="min-h-screen bg-[#0a0f1e] p-5 max-w-lg mx-auto">
-      {/* Progress */}
-      <div className="flex items-center gap-2 mb-8 pt-4">
-        {[1,2,3].map(n => (
-          <div key={n} className="flex items-center gap-2 flex-1">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-              ${step > n ? 'bg-[#25D366] text-white'
-              : step === n ? 'bg-[#25D366]/30 text-[#25D366] border border-[#25D366]'
-              : 'bg-white/10 text-white/30'}`}>
-              {step > n ? '✓' : n}
-            </div>
-            {n < 3 && <div className={`h-0.5 flex-1 rounded ${step > n ? 'bg-[#25D366]' : 'bg-white/10'}`} />}
-          </div>
-        ))}
-      </div>
 
-      {/* STEP 1 — Serviço */}
-      {step === 1 && (
+      {/* Header para guest / remarcar */}
+      {(guestMode || isReschedule) && (
+        <div className="pt-6 pb-2 flex items-center gap-3">
+          <button
+            onClick={() => { setRescheduleBooking(null); setScreen(guestMode ? 'login' : 'mybookings'); }}
+            className="text-white/50 hover:text-white transition-colors"
+          >
+            ← Voltar
+          </button>
+          <span className="text-white/30">|</span>
+          <span className="text-white/70 text-sm font-medium">
+            {isReschedule ? `Remarcar: ${rescheduleBooking.service?.name}` : 'Agendar sem cadastro'}
+          </span>
+        </div>
+      )}
+
+      {/* Progress (não mostra em remarcar pois começa no passo 2) */}
+      {!isReschedule && step < 4 && (
+        <div className="flex items-center gap-2 mb-8 pt-4">
+          {[1,2,3].map(n => (
+            <div key={n} className="flex items-center gap-2 flex-1">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                ${step > n ? 'bg-[#25D366] text-white'
+                : step === n ? 'bg-[#25D366]/30 text-[#25D366] border border-[#25D366]'
+                : 'bg-white/10 text-white/30'}`}>
+                {step > n ? '✓' : n}
+              </div>
+              {n < 3 && <div className={`h-0.5 flex-1 rounded ${step > n ? 'bg-[#25D366]' : 'bg-white/10'}`} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isReschedule && step < 4 && (
+        <div className="flex items-center gap-2 mb-8 pt-2">
+          {[2,3].map((n, i) => (
+            <div key={n} className="flex items-center gap-2 flex-1">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                ${step > n ? 'bg-[#25D366] text-white'
+                : step === n ? 'bg-[#25D366]/30 text-[#25D366] border border-[#25D366]'
+                : 'bg-white/10 text-white/30'}`}>
+                {step > n ? '✓' : i + 1}
+              </div>
+              {i < 1 && <div className={`h-0.5 flex-1 rounded ${step > n ? 'bg-[#25D366]' : 'bg-white/10'}`} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* STEP 1 — Serviço (só no modo normal) */}
+      {step === 1 && !isReschedule && (
         <div>
           <h2 className="font-display text-2xl text-white font-bold mb-1">Escolha o serviço</h2>
           <p className="text-white/50 text-sm mb-6">Selecione o que deseja fazer</p>
@@ -119,8 +173,12 @@ export default function BookingScreen() {
       {/* STEP 2 — Data e horário */}
       {step === 2 && (
         <div>
-          <h2 className="font-display text-2xl text-white font-bold mb-1">Data e horário</h2>
-          <p className="text-white/50 text-sm mb-5">Serviço: <span className="text-white">{selected?.name}</span></p>
+          <h2 className="font-display text-2xl text-white font-bold mb-1">
+            {isReschedule ? 'Novo horário' : 'Data e horário'}
+          </h2>
+          <p className="text-white/50 text-sm mb-5">
+            Serviço: <span className="text-white">{selected?.name}</span>
+          </p>
 
           {/* Calendário horizontal */}
           <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
@@ -169,7 +227,10 @@ export default function BookingScreen() {
           )}
 
           <div className="flex gap-3">
-            <button onClick={() => setStep(1)} className="flex-1 border border-white/10 text-white/70 font-semibold py-4 rounded-2xl">
+            <button
+              onClick={() => isReschedule ? setScreen('mybookings') : setStep(1)}
+              className="flex-1 border border-white/10 text-white/70 font-semibold py-4 rounded-2xl"
+            >
               ← Voltar
             </button>
             <button
@@ -185,34 +246,79 @@ export default function BookingScreen() {
       {/* STEP 3 — Confirmação */}
       {step === 3 && (
         <div>
-          <h2 className="font-display text-2xl text-white font-bold mb-1">Confirmar</h2>
+          <h2 className="font-display text-2xl text-white font-bold mb-1">
+            {isReschedule ? 'Confirmar remarcação' : 'Confirmar'}
+          </h2>
           <p className="text-white/50 text-sm mb-6">Revise os dados do agendamento</p>
+
+          {isReschedule && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-4 flex items-center gap-3">
+              <span className="text-2xl">📅</span>
+              <div className="text-sm">
+                <p className="text-white/50">Data atual</p>
+                <p className="text-white/70">
+                  {new Date(rescheduleBooking.date).toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' })}
+                  {' às '}
+                  {new Date(rescheduleBooking.date).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 mb-6">
             <Row label="Serviço" value={selected?.name} />
-            <Row label="Data" value={new Date(selectedDate + 'T12:00').toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' })} />
-            <Row label="Horário" value={selectedSlot} />
+            <Row label={isReschedule ? 'Nova data' : 'Data'} value={new Date(selectedDate + 'T12:00').toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' })} />
+            <Row label={isReschedule ? 'Novo horário' : 'Horário'} value={selectedSlot} />
             <Row label="Duração" value={`${selected?.duration} minutos`} />
             <div className="border-t border-white/10 pt-3">
               <Row label="Total" value={`R$ ${selected?.price}`} highlight />
             </div>
           </div>
 
-          {/* Veículo (opcional) */}
-          <p className="text-white/70 text-sm font-medium mb-3">Dados do veículo <span className="text-white/30">(opcional)</span></p>
-          <div className="space-y-3 mb-6">
-            {[['Placa','plate','ABC-1234'],['Modelo','model','Fiat Argo'],['Cor','color','Prata']].map(([label, key, ph]) => (
-              <input
-                key={key}
-                placeholder={`${label} — ${ph}`}
-                value={vehicle[key]}
-                onChange={e => setVehicle(v => ({ ...v, [key]: e.target.value }))}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm transition-colors"
-              />
-            ))}
-          </div>
+          {/* Dados do convidado (só no modo guest) */}
+          {guestMode && (
+            <>
+              <p className="text-white/70 text-sm font-medium mb-3">
+                Seus dados <span className="text-red-400 text-xs">*obrigatório</span>
+              </p>
+              <div className="space-y-3 mb-4">
+                <input
+                  placeholder="Seu nome completo *"
+                  value={guest.name}
+                  onChange={e => setGuest(g => ({ ...g, name: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm transition-colors"
+                />
+                <input
+                  placeholder="Telefone / WhatsApp *"
+                  value={guest.phone}
+                  onChange={e => setGuest(g => ({ ...g, phone: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm transition-colors"
+                />
+              </div>
+            </>
+          )}
 
-          <div className="flex gap-3">
+          {/* Veículo (opcional) */}
+          {!isReschedule && (
+            <>
+              <p className="text-white/70 text-sm font-medium mb-3">
+                Dados do veículo <span className="text-white/30">(opcional)</span>
+              </p>
+              <div className="space-y-3 mb-6">
+                {[['Placa','plate','ABC-1234'],['Modelo','model','Fiat Argo'],['Cor','color','Prata']].map(([label, key, ph]) => (
+                  <input
+                    key={key}
+                    placeholder={`${label} — ${ph}`}
+                    value={vehicle[key]}
+                    onChange={e => setVehicle(v => ({ ...v, [key]: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm transition-colors"
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-3 mt-2">
             <button onClick={() => setStep(2)} className="flex-1 border border-white/10 text-white/70 font-semibold py-4 rounded-2xl">
               ← Voltar
             </button>
@@ -220,29 +326,36 @@ export default function BookingScreen() {
               onClick={handleBook} disabled={loading}
               className="flex-1 bg-[#25D366] text-white font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-60"
             >
-              {loading ? 'Agendando...' : 'Confirmar'}
+              {loading ? 'Aguarde...' : isReschedule ? 'Remarcar' : 'Confirmar'}
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 4 — Sucesso + WhatsApp */}
+      {/* STEP 4 — Sucesso */}
       {step === 4 && booking && (
         <div className="flex flex-col items-center text-center pt-8">
           <div className="w-24 h-24 bg-[#25D366]/20 rounded-full flex items-center justify-center text-5xl mb-6">
-            ✅
+            {isReschedule ? '📅' : '✅'}
           </div>
-          <h2 className="font-display text-3xl text-white font-bold mb-2">Agendado!</h2>
-          <p className="text-white/60 mb-8">Seu agendamento foi criado com sucesso.</p>
+          <h2 className="font-display text-3xl text-white font-bold mb-2">
+            {isReschedule ? 'Remarcado!' : 'Agendado!'}
+          </h2>
+          <p className="text-white/60 mb-8">
+            {isReschedule ? 'Seu agendamento foi remarcado com sucesso.' : 'Seu agendamento foi criado com sucesso.'}
+          </p>
 
           <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-left space-y-2 mb-8">
             <Row label="Serviço" value={selected?.name} />
-            <Row label="Data / Hora" value={`${new Date(booking.date).toLocaleDateString('pt-BR')} às ${selectedSlot}`} />
+            <Row
+              label="Data / Hora"
+              value={`${new Date(booking.date).toLocaleDateString('pt-BR')} às ${new Date(booking.date).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}`}
+            />
             <Row label="Valor" value={`R$ ${selected?.price}`} highlight />
           </div>
 
           <button
-            onClick={() => openWhatsApp({ clientName: user.name, serviceName: selected.name, date: booking.date })}
+            onClick={() => openWhatsApp(successBooking)}
             className="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold py-5 rounded-2xl text-lg transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl shadow-[#25D366]/20 mb-3"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -251,9 +364,16 @@ export default function BookingScreen() {
             Confirmar via WhatsApp
           </button>
 
-          <button onClick={() => setScreen('mybookings')} className="text-white/50 text-sm underline">
-            Ver meus agendamentos
-          </button>
+          {!guestMode && (
+            <button onClick={() => setScreen('mybookings')} className="text-white/50 text-sm underline">
+              Ver meus agendamentos
+            </button>
+          )}
+          {guestMode && (
+            <button onClick={() => setScreen('login')} className="text-white/50 text-sm underline">
+              Criar conta para gerenciar agendamentos
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const BookingSchema = new mongoose.Schema({
-  client:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  client:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  guest:   { name: String, phone: String, email: String },
   service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
   date:    { type: Date, required: true },
   status:  {
@@ -16,7 +17,6 @@ const BookingSchema = new mongoose.Schema({
   },
   notes:      { type: String },
   totalPrice: { type: Number },
-  whatsappSent: { type: Boolean, default: false },
 }, { timestamps: true });
 
 // Prevent double-booking same slot

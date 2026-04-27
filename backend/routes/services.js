@@ -11,6 +11,11 @@ router.get('/', async (req, res) => {
 // POST /api/services (admin)
 router.post('/', authenticate, adminOnly, async (req, res) => {
   try {
+    const { name, price, duration } = req.body;
+    if (!name?.trim())          return res.status(400).json({ error: 'Nome é obrigatório' });
+    if (!price || price <= 0)   return res.status(400).json({ error: 'Preço deve ser maior que zero' });
+    if (!duration || duration <= 0) return res.status(400).json({ error: 'Duração deve ser maior que zero' });
+
     const service = await Service.create(req.body);
     res.status(201).json(service);
   } catch (err) {
@@ -20,9 +25,18 @@ router.post('/', authenticate, adminOnly, async (req, res) => {
 
 // PUT /api/services/:id (admin)
 router.put('/:id', authenticate, adminOnly, async (req, res) => {
-  const service = await Service.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!service) return res.status(404).json({ error: 'Serviço não encontrado' });
-  res.json(service);
+  try {
+    const { name, price, duration } = req.body;
+    if (name !== undefined && !name?.trim()) return res.status(400).json({ error: 'Nome não pode ser vazio' });
+    if (price !== undefined && price <= 0)   return res.status(400).json({ error: 'Preço deve ser maior que zero' });
+    if (duration !== undefined && duration <= 0) return res.status(400).json({ error: 'Duração deve ser maior que zero' });
+
+    const service = await Service.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!service) return res.status(404).json({ error: 'Serviço não encontrado' });
+    res.json(service);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // DELETE /api/services/:id (admin)
@@ -31,7 +45,7 @@ router.delete('/:id', authenticate, adminOnly, async (req, res) => {
   res.json({ message: 'Serviço desativado' });
 });
 
-// Seed initial services
+// Seed initial services (idempotent — skips existing names)
 router.post('/seed', authenticate, adminOnly, async (req, res) => {
   const defaults = [
     { name: 'Lavagem Simples',     price: 40,  duration: 30,  icon: '🚿', description: 'Lavagem externa completa' },
@@ -40,8 +54,12 @@ router.post('/seed', authenticate, adminOnly, async (req, res) => {
     { name: 'Polimento',           price: 250, duration: 180, icon: '💎', description: 'Polimento de pintura completo' },
     { name: 'Vitrificação',        price: 500, duration: 240, icon: '🛡️', description: 'Proteção cerâmica de pintura' },
   ];
-  await Service.insertMany(defaults);
-  res.json({ message: 'Serviços padrão criados!' });
+  let created = 0;
+  for (const svc of defaults) {
+    const exists = await Service.findOne({ name: svc.name });
+    if (!exists) { await Service.create(svc); created++; }
+  }
+  res.json({ message: `${created} serviço(s) padrão criado(s).` });
 });
 
 module.exports = router;

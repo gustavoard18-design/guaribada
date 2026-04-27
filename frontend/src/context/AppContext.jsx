@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 const AppContext = createContext();
 
-const API = axios.create({ baseURL: 'https://guaribada-production.up.railway.app/api' });
+const API = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api' });
 
 API.interceptors.request.use(cfg => {
   const token = localStorage.getItem('token');
@@ -13,9 +13,10 @@ API.interceptors.request.use(cfg => {
 });
 
 export function AppProvider({ children }) {
-  const [user, setUser]         = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [screen, setScreen]     = useState('home');
+  const [user, setUser]               = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [screen, setScreen]           = useState('home');
+  const [rescheduleBooking, setRescheduleBooking] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -53,7 +54,7 @@ export function AppProvider({ children }) {
   };
 
   return (
-    <AppContext.Provider value={{ user, loading, screen, setScreen, login, register, logout, API }}>
+    <AppContext.Provider value={{ user, loading, screen, setScreen, login, register, logout, API, rescheduleBooking, setRescheduleBooking }}>
       {children}
     </AppContext.Provider>
   );
