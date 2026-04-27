@@ -3,7 +3,9 @@ const Booking = require('../models/Booking');
 const Service = require('../models/Service');
 const { authenticate, adminOnly, optionalAuthenticate } = require('../middleware/auth');
 
-// Helper: build occupied minutes set for a given day
+const MAX_PER_SLOT = 2; // número de baias simultâneas
+
+// Helper: retorna contagem de agendamentos por intervalo de 30min
 async function getOccupiedMinutes(dayStart, dayEnd, excludeId = null) {
   const query = {
     date: { $gte: dayStart, $lt: dayEnd },
@@ -12,20 +14,22 @@ async function getOccupiedMinutes(dayStart, dayEnd, excludeId = null) {
   if (excludeId) query._id = { $ne: excludeId };
 
   const booked = await Booking.find(query).populate('service');
-  const occupied = new Set();
+  const occupied = {};
   booked.forEach(b => {
     const slotStart = b.date.getHours() * 60 + b.date.getMinutes();
-    for (let m = slotStart; m < slotStart + b.service.duration; m += 30) occupied.add(m);
+    for (let m = slotStart; m < slotStart + b.service.duration; m += 30) {
+      occupied[m] = (occupied[m] || 0) + 1;
+    }
   });
   return occupied;
 }
 
-// Helper: check if a given date/duration has a conflict
+// Helper: verifica conflito respeitando o limite de baias simultâneas
 function hasTimeConflict(occupied, bookingDate, duration) {
   const requestedMinute = bookingDate.getHours() * 60 + bookingDate.getMinutes();
   const slotsNeeded = Math.ceil(duration / 30);
   return Array.from({ length: slotsNeeded }, (_, i) => requestedMinute + i * 30)
-              .some(m => occupied.has(m));
+              .some(m => (occupied[m] || 0) >= MAX_PER_SLOT);
 }
 
 // GET /api/bookings/available-slots?date=YYYY-MM-DD&serviceId=xxx  (public)
@@ -41,11 +45,11 @@ router.get('/available-slots', async (req, res) => {
 
   const occupied = await getOccupiedMinutes(start, end);
 
-  // Generate 30-min slots from 08:00 to 17:30
+  // Gera slots de 30min das 08:00 às 17:30 (máx. MAX_PER_SLOT agendamentos simultâneos)
   const slots = [];
   for (let m = 8 * 60; m <= 17 * 60 + 30; m += 30) {
     const slotEnd = m + service.duration;
-    const available = ![...Array(Math.ceil(service.duration / 30))].some((_, i) => occupied.has(m + i * 30))
+    const available = ![...Array(Math.ceil(service.duration / 30))].some((_, i) => (occupied[m + i * 30] || 0) >= MAX_PER_SLOT)
                    && slotEnd <= 18 * 60;
     const hh = String(Math.floor(m / 60)).padStart(2, '0');
     const mm = String(m % 60).padStart(2, '0');

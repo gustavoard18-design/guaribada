@@ -36,7 +36,7 @@ function Router() {
     <div className="min-h-screen bg-[#0a0f1e] font-sans">
       {user && <Navbar />}
       <div className={user ? 'pb-20 md:pb-0 md:pt-16' : ''}>
-        {screens[screen] || <HomeScreen />}
+        {!user && screen !== 'register' ? <LoginScreen /> : screens[screen] || <HomeScreen />}
       </div>
     </div>
   );

@@ -70,12 +70,13 @@ export default function AdminDashboard() {
         <input
           type="date" value={filterDate}
           onChange={e => setFilterDate(e.target.value)}
-          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#25D366]"
+          style={{ colorScheme: 'dark' }}
+          className="flex-1 bg-[#1f2937] border border-white/20 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#25D366]"
         />
         <select
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value)}
-          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#25D366]"
+          className="flex-1 bg-[#1f2937] border border-white/20 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#25D366]"
         >
           <option value="">Todos os status</option>
           {STATUS_OPTIONS.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
@@ -90,7 +91,7 @@ export default function AdminDashboard() {
         <p className="text-white/30 text-center py-10">Carregando...</p>
       ) : bookings.length === 0 ? (
         <div className="text-center py-20">
-          <div className="text-5xl mb-4">📋</div>
+          <div className="text-5xl mb-4">🗓️</div>
           <p className="text-white/50">Nenhum agendamento encontrado</p>
         </div>
       ) : (
@@ -125,7 +126,7 @@ export default function AdminDashboard() {
                   <select
                     value={b.status}
                     onChange={e => updateStatus(b._id, e.target.value)}
-                    className={`text-xs font-semibold px-3 py-1.5 rounded-xl border cursor-pointer bg-transparent ${STATUS_COLORS[b.status]}`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-xl border cursor-pointer bg-[#1f2937] ${STATUS_COLORS[b.status]}`}
                   >
                     {STATUS_OPTIONS.map(s => <option key={s} value={s} className="bg-[#1f2937] text-white">{STATUS_LABELS[s]}</option>)}
                   </select>
