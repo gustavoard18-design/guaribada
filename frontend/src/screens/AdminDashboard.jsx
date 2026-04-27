@@ -1,16 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { STATUS_LIST, STATUS_LABELS, STATUS_COLORS_BORDER } from '../utils/constants';
+import { maskPhone } from '../utils/format';
 import toast from 'react-hot-toast';
 
-const STATUS_OPTIONS = ['pending','confirmed','in_progress','completed','cancelled'];
-const STATUS_LABELS  = { pending:'Pendente', confirmed:'Confirmado', in_progress:'Em andamento', completed:'Concluído', cancelled:'Cancelado' };
-const STATUS_COLORS  = {
-  pending:     'text-yellow-400 bg-yellow-400/10 border-yellow-400/30',
-  confirmed:   'text-[#25D366] bg-[#25D366]/10 border-[#25D366]/30',
-  in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/30',
-  completed:   'text-white/50 bg-white/5 border-white/10',
-  cancelled:   'text-red-400 bg-red-400/10 border-red-400/30',
-};
+const STATUS_OPTIONS = STATUS_LIST;
 
 const DAYS_AHEAD = 30;
 const DAY_NAMES  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -190,9 +184,11 @@ function NewBookingModal({ onClose, onCreated, API }) {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm"
               />
               <input
-                placeholder="Telefone / WhatsApp *"
+                type="tel"
+                placeholder="(24) 99999-9999 *"
                 value={client.phone}
-                onChange={e => setClient(c => ({ ...c, phone: e.target.value }))}
+                maxLength={15}
+                onChange={e => setClient(c => ({ ...c, phone: maskPhone(e.target.value) }))}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm"
               />
             </div>
@@ -362,7 +358,7 @@ export default function AdminDashboard() {
                   <select
                     value={b.status}
                     onChange={e => updateStatus(b._id, e.target.value)}
-                    className={`text-xs font-semibold px-3 py-1.5 rounded-xl border cursor-pointer bg-[#1f2937] ${STATUS_COLORS[b.status]}`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-xl border cursor-pointer bg-[#1f2937] ${STATUS_COLORS_BORDER[b.status]}`}
                   >
                     {STATUS_OPTIONS.map(s => <option key={s} value={s} className="bg-[#1f2937] text-white">{STATUS_LABELS[s]}</option>)}
                   </select>

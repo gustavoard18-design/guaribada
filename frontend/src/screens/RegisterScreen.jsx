@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { maskPhone } from '../utils/format';
 import toast from 'react-hot-toast';
 
 const Field = ({ label, type = 'text', value, onChange, placeholder, maxLength }) => (
@@ -11,13 +12,6 @@ const Field = ({ label, type = 'text', value, onChange, placeholder, maxLength }
     />
   </div>
 );
-
-function maskPhone(value) {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 2) return `(${digits}`;
-  if (digits.length <= 7) return `(${digits.slice(0,2)}) ${digits.slice(2)}`;
-  return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
-}
 
 export default function RegisterScreen() {
   const { register, setScreen } = useApp();

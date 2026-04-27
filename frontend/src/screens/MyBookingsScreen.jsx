@@ -1,15 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { openWhatsApp } from '../utils/whatsapp';
+import { STATUS_LABELS, STATUS_COLORS } from '../utils/constants';
 import toast from 'react-hot-toast';
-
-const STATUS = {
-  pending:     { label: 'Pendente',    color: 'text-yellow-400 bg-yellow-400/10' },
-  confirmed:   { label: 'Confirmado',  color: 'text-[#25D366] bg-[#25D366]/10' },
-  in_progress: { label: 'Em andamento',color: 'text-blue-400 bg-blue-400/10' },
-  completed:   { label: 'Concluído',   color: 'text-white/50 bg-white/5' },
-  cancelled:   { label: 'Cancelado',   color: 'text-red-400 bg-red-400/10' },
-};
 
 export default function MyBookingsScreen() {
   const { user, API, setScreen, setRescheduleBooking } = useApp();
@@ -68,7 +61,6 @@ export default function MyBookingsScreen() {
       ) : (
         <div className="space-y-4">
           {bookings.map(b => {
-            const st = STATUS[b.status] || STATUS.pending;
             const dateObj = new Date(b.date);
             const isPast = dateObj < new Date();
             return (
@@ -82,8 +74,8 @@ export default function MyBookingsScreen() {
                       {dateObj.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
                     </p>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${st.color}`}>
-                    {st.label}
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[b.status]}`}>
+                    {STATUS_LABELS[b.status]}
                   </span>
                 </div>
 

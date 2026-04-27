@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { STATUS_COLORS, STATUS_LABELS_LONG } from '../utils/constants';
 
 export default function HomeScreen() {
   const { user, setScreen, API } = useApp();
@@ -15,21 +16,6 @@ export default function HomeScreen() {
       }).catch(() => {});
     }
   }, []);
-
-  const statusColors = {
-    pending: 'text-yellow-400 bg-yellow-400/10',
-    confirmed: 'text-[#25D366] bg-[#25D366]/10',
-    in_progress: 'text-blue-400 bg-blue-400/10',
-    completed: 'text-white/50 bg-white/5',
-    cancelled: 'text-red-400 bg-red-400/10',
-  };
-  const statusLabels = {
-    pending: 'Aguardando confirmação',
-    confirmed: 'Confirmado ✓',
-    in_progress: 'Em andamento',
-    completed: 'Concluído',
-    cancelled: 'Cancelado',
-  };
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] p-5 max-w-lg mx-auto">
@@ -49,8 +35,8 @@ export default function HomeScreen() {
             {' às '}
             {new Date(lastBooking.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </p>
-          <span className={`inline-block mt-3 px-3 py-1 rounded-full text-xs font-semibold ${statusColors[lastBooking.status]}`}>
-            {statusLabels[lastBooking.status]}
+          <span className={`inline-block mt-3 px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[lastBooking.status]}`}>
+            {STATUS_LABELS_LONG[lastBooking.status]}
           </span>
         </div>
       )}

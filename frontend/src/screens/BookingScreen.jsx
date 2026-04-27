@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { openWhatsApp } from '../utils/whatsapp';
+import { maskPhone } from '../utils/format';
 import toast from 'react-hot-toast';
 
 const DAYS_AHEAD = 14;
@@ -289,9 +290,11 @@ export default function BookingScreen({ guestMode = false }) {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm transition-colors"
                 />
                 <input
-                  placeholder="Telefone / WhatsApp *"
+                  type="tel"
+                  placeholder="(24) 99999-9999 *"
                   value={guest.phone}
-                  onChange={e => setGuest(g => ({ ...g, phone: e.target.value }))}
+                  maxLength={15}
+                  onChange={e => setGuest(g => ({ ...g, phone: maskPhone(e.target.value) }))}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#25D366] text-sm transition-colors"
                 />
               </div>
